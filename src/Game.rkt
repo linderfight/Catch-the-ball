@@ -1,0 +1,227 @@
+   #lang racket
+
+(require racket/gui)
+(require racket/draw)
+
+(play-sound "intorMusic.wav" #t)
+
+(define the-bitmap 
+  (make-object bitmap% "gamelogo.png"))
+
+(define frame1 (new frame%
+                    [label "Catch the Ball "]
+                    [width 250]
+                    [height 500]                 
+                    [stretchable-width #f]	 
+                    [stretchable-height #f]
+                    ))
+
+(define pan1 (new panel% [parent frame1]))
+
+(define pan2 (new vertical-panel%
+                  [parent pan1]
+                  [alignment '(center bottom)]
+                  
+                  
+                  ))
+
+(define gamethread 0)
+
+(define mycanvas
+  (instantiate canvas%
+    (pan1)
+    (paint-callback
+     (lambda (canvas dc)
+       (send dc draw-bitmap the-bitmap 0 0)))
+    (min-width (send the-bitmap get-width))
+    (min-height (send the-bitmap get-height))))
+
+(define bttn (new button%
+                  [label "Play"]
+                  [parent pan2]
+                  [vert-margin 100]	 
+                  [horiz-margin 100]          
+                  [callback (lambda (button event)                           
+                              (send frame1 show #f)
+                              (send frame show #t)
+                              (set! gamethread (thread gameLoop))
+
+                             )]))
+
+
+
+;Constants
+
+(define SCREEN_WIDTH 500)
+(define SCREEN_HEIGHT 500)
+
+(define platformWidth 40)
+(define PLATFORM_HEIGHT 10)
+(define PLATFORM_COLOR "red")
+
+;Variables
+(define platformX 244)
+(define platformY 450)
+(define platformSpeed 5)
+
+(define ballX 50)
+(define ballY 150)
+(define ballSpeedY 0)
+(define ballSize 10)
+(define BALL_COLOR "yellow")
+
+(define BACKGROUND_COLOR "black")
+(define BACKGROUNDx 0)
+(define BACKGROUNDy 0)
+(define BACKGROUND_WIDTH 484) 
+(define BACKGROUND_HEIGHT 461)
+(define TOTAL_BALLS 8)
+(define gameOver #f)
+(define score 0)
+(define highestScore 0)
+
+(define moveLeft #f)
+(define moveRight #f)
+
+(define numGen make-pseudo-random-generator)
+
+;Draws a window.
+(define frame (new frame% 
+                   [label "Catch the Ball"]
+                   [width SCREEN_WIDTH]
+                   [height SCREEN_HEIGHT]
+                   ))
+
+
+(define my-canvas%
+  (class canvas%
+    (define/override (on-char event)
+            
+      (cond
+        
+        [ (equal? (send event get-key-code) 'left)
+          (set! moveLeft #t)
+          ]
+
+        [ (equal? (send event get-key-release-code) 'left)
+          (set! moveLeft #f)
+          ]
+             
+
+        [ (equal? (send event get-key-code) 'right)
+          (set! moveRight #t)
+          ]
+
+        [ (equal? (send event get-key-release-code) 'right)
+          (set! moveRight #f)
+          ]
+        
+        
+        ))
+    (super-new)
+    ))
+
+;Draws all objects on window.
+(define platno (new my-canvas% [parent frame]
+                    [paint-callback
+                     (lambda (canvas dc)        
+                       (send dc set-brush "black" 'solid)
+                       (send dc draw-rectangle BACKGROUNDx BACKGROUNDy BACKGROUND_WIDTH BACKGROUND_HEIGHT)        
+                       (send dc set-brush "red" 'solid)       
+                       (send dc draw-rectangle platformX platformY platformWidth PLATFORM_HEIGHT)
+                       (send dc draw-rectangle platformX 419 1 40)
+                       (send dc draw-rectangle (+ platformX platformWidth) 419 1 40)                       
+                       (send dc set-brush BALL_COLOR 'solid)
+                       (send dc draw-ellipse ballX ballY ballSize ballSize)
+
+                      
+                       (send dc set-font (make-font #:size 11 #:family 'roman #:weight 'bold))
+                       (send dc set-text-foreground "white")               
+                       (send dc draw-text (format "Current score: ~s" score) 5 1)
+                             
+                       (send dc set-font (make-font #:size 11 #:family 'roman #:weight 'bold))
+                       (send dc set-text-foreground "white")               
+                       (send dc draw-text (format "Highest score: ~s" highestScore) 365 1)
+
+
+                       )
+                     
+                     ]
+                    ))
+
+; Updates ball movement.
+( define(moveBall speed)
+   (set! ballY(+ ballY speed)))
+   
+( define(movePlatform)
+   (if(equal? moveLeft #t)(set! platformX (- platformX platformSpeed))0)
+   (if(equal? moveRight #t)(set! platformX (+ platformX platformSpeed))0)
+
+   )
+
+( define(resetAndScore)
+   (if (< score 0) (set! score 0)
+       ( set! score ( - score 2)))   
+      
+  
+   ( spawnBallRandom)
+   )
+
+
+( define( resolveCollision )
+
+   ;ball-screen collision
+   ( if(> ballY (- SCREEN_HEIGHT 45))(resetAndScore) 0)
+
+   ;ball-platform collision
+   ( if (and
+         (and
+          (> ballY (+ platformY (- PLATFORM_HEIGHT 20)))
+          (and [> ballX platformX] [< ballX (+ platformX platformWidth)]))
+         (> ballSpeedY 0))
+        (spawnBallRandom)0)
+   )
+
+
+(define (spawnBallRandom)
+  (set! ballY (* (random 100 300 (make-pseudo-random-generator)) -1))
+  (set! ballX (random 1 (- SCREEN_HEIGHT 100)(make-pseudo-random-generator)))
+  (if (< score 0) (set! score 0)
+      ( set! score ( + score 1)))
+  (if (> highestScore score) (set! highestScore highestScore) (set! highestScore score))
+  (checkGameState score)
+  )
+
+(define checkGameState (λ (x) ;will only accept integer
+                         (cond
+                           ((= x 0)
+                            (printf "GAME OVER \n")
+                            (printf "You Scored: ~s \n" highestScore)
+                            (kill-thread gamethread)
+                            
+                          
+                           ))))
+                          
+                       
+
+(define (levelUp)     
+  (set! ballSpeedY (+ ballSpeedY 1/40 ))
+  (set! platformSpeed (+ platformSpeed 1/80))
+  (set! platformWidth (+ platformWidth 1/20 ))
+  )
+
+                        
+
+(send frame1 show #t)
+
+( define(gameLoop)
+   (moveBall ballSpeedY)
+   (movePlatform)
+   (if (equal? (remainder score 3)0)
+       ( levelUp) 0)   
+   (resolveCollision)
+   (send frame show #t) 
+   (sleep/yield 0.01667)
+   
+   (gameLoop)
+   )
