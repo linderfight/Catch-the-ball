@@ -87,7 +87,7 @@
 
 ;Draws a window.
 (define frame (new frame% 
-                   [label "BrickBreaker"]
+                   [label "Catch the Ball"]
                    [width SCREEN_WIDTH]
                    [height SCREEN_HEIGHT]
                    ))
